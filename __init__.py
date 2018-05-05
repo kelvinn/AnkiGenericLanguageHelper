@@ -2,21 +2,21 @@ import sys
 import os
 import functools
 
-try:
-    # import the main window object (mw) from aqt
-    from aqt import mw
-    # import the "show info" tool from utils.py
-    from aqt.utils import showInfo
-    # import all of the Qt GUI library
-    from aqt.qt import *
-except:
-    from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QGroupBox, QDialog, QVBoxLayout, QGridLayout, QLabel, QButtonGroup
-    from PyQt5.QtGui import QIcon, QPixmap
-    from PyQt5.QtGui import QIcon, QColor
-    from PyQt5.QtCore import pyqtSlot
+import sys
+sys.path.append("/Users/kelvin/Workspace/anki")
 
-#test
+
+# import the main window object (mw) from aqt
+from aqt import mw
+# import the "show info" tool from utils.py
+from aqt.utils import showInfo
+# import all of the Qt GUI library
+from aqt.qt import *
+
 from random import randrange
+
+
+
 
 class UI(QWidget):
  
@@ -27,26 +27,39 @@ class UI(QWidget):
         self.top = 10
         self.width = 320
         self.height = 100
+        self.note_ids = None
+        self.current_note_id = None
         self.initUI()
  
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
+        self.note_ids = self.getTagsWithGLT()
+        self.current_note_id = self.note_ids[0]
 
         self.btn_grp = QButtonGroup()
         self.btn_grp.setExclusive(True)
 
         self.createFrovoGridLayout()
-        self.createGridLayout()
+        self.createImageGridLayout()
+        self.createWordTextBoxLayout()
 
         windowLayout = QVBoxLayout()
-        windowLayout.addWidget(self.horizontalGroupBox2)
-        windowLayout.addWidget(self.horizontalGroupBox)
+        windowLayout.addWidget(self.horizontalGroupBoxWord)
+        windowLayout.addWidget(self.horizontalGroupBoxAudio)
+        windowLayout.addWidget(self.horizontalGroupBoxImages)
 
+
+        button_next = QPushButton("Save")
+
+        windowLayout.addWidget(button_next)
         self.setLayout(windowLayout)
  
         self.show()
 
+    def getTagsWithGLT(self):
+        ids = mw.col.findNotes("tag:glt")
+        return ids
 
     @pyqtSlot()
     def on_click(self):
@@ -59,33 +72,34 @@ class UI(QWidget):
     def print_id(self, event, source_object=None):
         print("Clicked, from", source_object)
         source_object.toggle()
+        ids = mw.col.findNotes("tag:glt")
+        for id in ids:
+            note = mw.col.getNote(id)
+            note.delTag("glt")
+            note.flush()
+            #question = card.q()
+            #answer = card.a()
+
+        #showInfo(str(dir(card)))
         print(source_object.forvo_id)
 
-    def createGridLayout(self):
-        self.horizontalGroupBox = QGroupBox("Images")
+    def createWordTextBoxLayout(self):
+        self.horizontalGroupBoxWord = QGroupBox("Word")
 
+        note = mw.col.getNote(self.current_note_id)
+        front = note.items()[0][1]
         layout = QGridLayout()
+        textbox = QLineEdit(self)
+        textbox.setText(str(front))
+        textbox.resize(280, 40)
 
+        layout.addWidget(textbox)
 
-        for row in range(0,3):
-            for col in range(0,3):
-                label = QLabel(self)
-                #pixmap = QPixmap('../../addons21/GenericLanguageHelper/user_files/dog.jpg').scaledToWidth(256)
-                pixmap = QPixmap('user_files/dog.jpg').scaledToWidth(200)
-                #dir_path = os.path.dirname(os.path.realpath(__file__))
-                #cwd = os.getcwd()
-                #showInfo(cwd)
-                label.setPixmap(pixmap)
-                #label.setStyleSheet("QLabel { background-color : red; color : blue; }");
-                label.filename = "row" + str(row) + " col" + str(col)
-                label.mousePressEvent = functools.partial(self.print_some, source_object=label)
-                layout.addWidget(label,row,col)
- 
-        self.horizontalGroupBox.setLayout(layout)
+        self.horizontalGroupBoxWord.setLayout(layout)
 
 
     def createFrovoGridLayout(self):
-        self.horizontalGroupBox2 = QGroupBox("Audio")
+        self.horizontalGroupBoxAudio = QGroupBox("Audio")
         layout = QGridLayout()
         # layout.setColumnStretch(1, 4)
         # layout.setColumnStretch(2, 4)
@@ -100,7 +114,31 @@ class UI(QWidget):
             self.btn_grp.addButton(button)
             layout.addWidget(button, 0, col)
 
-        self.horizontalGroupBox2.setLayout(layout)
+        self.horizontalGroupBoxAudio.setLayout(layout)
+
+    def createImageGridLayout(self):
+        self.horizontalGroupBoxImages = QGroupBox("Images")
+
+        layout = QGridLayout()
+
+        for row in range(0,3):
+            for col in range(0,3):
+                label = QLabel(self)
+                pixmap = QPixmap('../../addons21/GenericLanguageHelper/user_files/dog.jpg').scaledToWidth(200)
+                #pixmap = QPixmap('user_files/dog.jpg').scaledToWidth(200)
+                #dir_path = os.path.dirname(os.path.realpath(__file__))
+                #cwd = os.getcwd()
+                #showInfo(cwd)
+                label.setPixmap(pixmap)
+                #label.setStyleSheet("QLabel { background-color : red; color : blue; }");
+                label.filename = "row" + str(row) + " col" + str(col)
+                label.mousePressEvent = functools.partial(self.print_some, source_object=label)
+                layout.addWidget(label,row,col)
+ 
+        self.horizontalGroupBoxImages.setLayout(layout)
+
+
+
 
 
 def connectUI():
