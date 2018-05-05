@@ -16,8 +16,6 @@ from aqt.qt import *
 from random import randrange
 
 
-
-
 class UI(QWidget):
  
     def __init__(self):
@@ -29,6 +27,9 @@ class UI(QWidget):
         self.height = 100
         self.note_ids = None
         self.current_note_id = None
+        self.word_field = None
+        self.image_field = None
+        self.audio_field = None
         self.initUI()
  
     def initUI(self):
@@ -36,6 +37,11 @@ class UI(QWidget):
         self.setGeometry(self.left, self.top, self.width, self.height)
         self.note_ids = self.getTagsWithGLT()
         self.current_note_id = self.note_ids[0]
+
+        config = mw.addonManager.getConfig(__name__)
+        self.word_field = config['word_field']
+        self.audio_field = config['audio_field']
+        self.image_field = config['image_field']
 
         self.btn_grp = QButtonGroup()
         self.btn_grp.setExclusive(True)
@@ -65,20 +71,25 @@ class UI(QWidget):
     def on_click(self):
         print("clicked")
 
-    def print_some(self, event, source_object=None):
+    def print_some(self, event, source_object=None, labels=None):
         print("Clicked, from", source_object)
+        #source_object.palette().highlight().color().name()
+        for label in labels:
+            label.setStyleSheet("QLabel { padding: 4px;}")
+        source_object.setStyleSheet("QLabel { background-color : red; color : blue; } QLabel { padding: 4px; }")
+        #source_object.setStyleSheet("QLabel{background:transparent}")
+
         print(source_object.filename)
 
     def print_id(self, event, source_object=None):
         print("Clicked, from", source_object)
         source_object.toggle()
         ids = mw.col.findNotes("tag:glt")
-        for id in ids:
-            note = mw.col.getNote(id)
-            note.delTag("glt")
-            note.flush()
-            #question = card.q()
-            #answer = card.a()
+        #for id in ids:
+        #    note = mw.col.getNote(id)
+        #    note.delTag("glt")
+        #    note.flush()
+
 
         #showInfo(str(dir(card)))
         print(source_object.forvo_id)
@@ -87,10 +98,11 @@ class UI(QWidget):
         self.horizontalGroupBoxWord = QGroupBox("Word")
 
         note = mw.col.getNote(self.current_note_id)
-        front = note.items()[0][1]
+
+        note_items = dict(note.items())
         layout = QGridLayout()
         textbox = QLineEdit(self)
-        textbox.setText(str(front))
+        textbox.setText(str(note_items[self.word_field]))
         textbox.resize(280, 40)
 
         layout.addWidget(textbox)
@@ -116,10 +128,12 @@ class UI(QWidget):
 
         self.horizontalGroupBoxAudio.setLayout(layout)
 
+
     def createImageGridLayout(self):
         self.horizontalGroupBoxImages = QGroupBox("Images")
 
         layout = QGridLayout()
+        labels = []
 
         for row in range(0,3):
             for col in range(0,3):
@@ -129,10 +143,26 @@ class UI(QWidget):
                 #dir_path = os.path.dirname(os.path.realpath(__file__))
                 #cwd = os.getcwd()
                 #showInfo(cwd)
+                defaultHLBackground = "#%02x%02x%02x" % label.palette().highlight().color().getRgb()[:3]
+                defaultHLText = "#%02x%02x%02x" % label.palette().highlightedText().color().getRgb()[:3]
+
+
                 label.setPixmap(pixmap)
+
+                #label.setStyleSheet("QWidget:pressed { background:%s; color: %s;} QWidget { padding: 4px;}" % (
+                #    defaultHLBackground, defaultHLText))
+
                 #label.setStyleSheet("QLabel { background-color : red; color : blue; }");
+                label.setStyleSheet("QLabel:hover { background:%s; color: %s;}" 
+                                    "QLabel { padding: 4px;}" % (
+                    defaultHLBackground, defaultHLText))
+
+                #label.setStyleSheet("QLabel:active { background-color : red; color : blue; } QLabel { padding: 4px; }")
+                labels.append(label)
+
                 label.filename = "row" + str(row) + " col" + str(col)
-                label.mousePressEvent = functools.partial(self.print_some, source_object=label)
+
+                label.mousePressEvent = functools.partial(self.print_some, source_object=label, labels=labels)
                 layout.addWidget(label,row,col)
  
         self.horizontalGroupBoxImages.setLayout(layout)
