@@ -14,7 +14,7 @@ from aqt.utils import showInfo
 from aqt.qt import *
 
 from random import randrange
-
+from .get_images import search_images
 
 class UI(QWidget):
  
@@ -45,6 +45,7 @@ class UI(QWidget):
 
         self.btn_grp = QButtonGroup()
         self.btn_grp.setExclusive(True)
+
 
         self.createFrovoGridLayout()
         self.createImageGridLayout()
@@ -135,10 +136,18 @@ class UI(QWidget):
         layout = QGridLayout()
         labels = []
 
+        # Lookup word
+        note = mw.col.getNote(self.current_note_id)
+        note_items = dict(note.items())
+        word = str(note_items[self.word_field])
+        search_images(list(word))
+        image_counter = 0
         for row in range(0,3):
             for col in range(0,3):
+                image_counter = image_counter+1
                 label = QLabel(self)
-                pixmap = QPixmap('../../addons21/GenericLanguageHelper/user_files/dog.jpg').scaledToWidth(200)
+                image_path = '../../addons21/GenericLanguageHelper/user_files/0%s.jpg' % image_counter
+                pixmap = QPixmap(image_path).scaledToHeight(150)
                 #pixmap = QPixmap('user_files/dog.jpg').scaledToWidth(200)
                 #dir_path = os.path.dirname(os.path.realpath(__file__))
                 #cwd = os.getcwd()
@@ -166,9 +175,6 @@ class UI(QWidget):
                 layout.addWidget(label,row,col)
  
         self.horizontalGroupBoxImages.setLayout(layout)
-
-
-
 
 
 def connectUI():
