@@ -14,7 +14,9 @@ from aqt.utils import showInfo
 from aqt.qt import *
 
 from random import randrange
-from .get_images import search_images
+from .get_images import search
+from GenericLanguageHelper import get_images
+
 
 class UI(QWidget):
  
@@ -117,6 +119,7 @@ class UI(QWidget):
         # layout.setColumnStretch(1, 4)
         # layout.setColumnStretch(2, 4)
 
+
         for col in range(0,5):
             r = randrange(10000,90000)
             button = QPushButton(str(r))
@@ -140,7 +143,7 @@ class UI(QWidget):
         note = mw.col.getNote(self.current_note_id)
         note_items = dict(note.items())
         word = str(note_items[self.word_field])
-        search_images(list(word))
+        get_images.search(list(word))
         image_counter = 0
         for row in range(0,3):
             for col in range(0,3):
@@ -154,7 +157,6 @@ class UI(QWidget):
                 #showInfo(cwd)
                 defaultHLBackground = "#%02x%02x%02x" % label.palette().highlight().color().getRgb()[:3]
                 defaultHLText = "#%02x%02x%02x" % label.palette().highlightedText().color().getRgb()[:3]
-
 
                 label.setPixmap(pixmap)
 

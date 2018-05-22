@@ -5,10 +5,18 @@ from bs4 import BeautifulSoup as Soup
 import json
 import urllib
 import base64
+import logging
 import re
-from urllib.request import urlopen, Request, urlretrieve
-from urllib.parse   import quote
+import os
+import multiprocessing
 
+from urllib.request import urlopen, Request, urlretrieve
+import requests
+import concurrent.futures
+from urllib.parse   import quote
+from PyQt5.QtMultimedia import QSound
+
+from time import sleep
 # programtically go through google image ajax json return
 # and save links to list
 # num_images is more of a suggestion
@@ -49,7 +57,6 @@ def get_links(query_string):
 
     # loop through images and put src in links list
     for j in range(len(plays)):
-        #pronunciation = re.findall("Play\(\d+,'(.*?)'", plays[j]["onclick"])
         match = pattern.search(plays[j]["onclick"])
         if match:
             links.append(url + base64.b64decode(match.group(1)).decode())
@@ -57,17 +64,36 @@ def get_links(query_string):
     return links
 
 
-def get_audio(links, directory, pre):
-    for i in range(10):
-        urlretrieve(links[i], "./"+directory+"/"+str(pre)+str(i)+".mp3")
+def f(x):
+    print("in f")
+    sleep(3)
+
+    return x*x
+
+def download(links, directory):
+    #for i in range(10):
+    #    print("starting download")
+    #    p = multiprocessing.Process(target=urlretrieve, args=(links[i], "./"+directory+"/"+str(i)+".mp3"))
+    #    p.start()
+    #    print("ended")
+        #urlretrieve(links[i], )
+    with multiprocessing.Pool(5) as p:
+        print('starting download"')
+        multiple_results = [p.apply_async(urlretrieve, (links[i], "./"+directory+"/"+str(i)+".mp3",)) for i in range(10)]
+        p.close()
+        try:
+            p.join()
+        except TimeoutError:
+            logging.error("Timed out waiting to download audio from Forvo")
+
+        #print([res.get(timeout=5) for res in multiple_results])
 
 
-def search_images(terms, output="../../addons21/GenericLanguageHelper/user_files/"):
-    for x in range(len(terms)):
-        all_links = get_links(terms[x])
-        get_audio(all_links, output, x)
+def search(term, output="../../addons21/GenericLanguageHelper/user_files/"):
+    all_links = get_links(term)
+    download(all_links, output)
 
 
 if __name__ == '__main__':
-    terms = ["狗"]
-    search_images(terms, output="audio/")
+    term = "狗"
+    search(term, output="audio/")

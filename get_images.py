@@ -19,7 +19,7 @@ def get_links(query_string):
     # step by 100 because each return gives up to 100 links
     #query_string = str(query_string.encode('utf-8').strip())
     #for i in range(0, num_images, 100):
-    url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&hl=zh&q=' + quote(query_string) + '&tbm=isch&ved=' \
+    url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&hl=zh&q=' + quote(query_string) + '&tbm=isch&tbs=iar:s&ved=' \
           '0ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ&start=' \
           '&yv=2&vet=10ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ.1m7NWePfFYaGmQG51q7IBg.i&ijn=1&asearch=' \
           'ichunk&async=_id:rg_s,_pms:s'
@@ -53,17 +53,17 @@ def get_links(query_string):
     return links
 
 
-def get_images(links, directory, pre):
+def download(links, directory, pre):
     for i in range(10):
         urlretrieve(links[i], "./"+directory+"/"+str(pre)+str(i)+".jpg")
 
 
-def search_images(terms, output="../../addons21/GenericLanguageHelper/user_files/"):
+def search(terms, output="../../addons21/GenericLanguageHelper/user_files/"):
     for x in range(len(terms)):
         all_links = get_links(terms[x])
-        get_images(all_links, output, x)
+        download(all_links, output, x)
 
 
 if __name__ == '__main__':
     terms = ["狗"]
-    search_images(terms, output="images/")
+    search(terms, output="images/")
