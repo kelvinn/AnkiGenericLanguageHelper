@@ -53,17 +53,16 @@ def get_links(query_string):
     return links
 
 
-def download(links, directory, pre):
+def download(links, directory):
     for i in range(10):
-        urlretrieve(links[i], "./"+directory+"/"+str(pre)+str(i)+".jpg")
+        urlretrieve(links[i], "./" + directory + "/" + str(i) + ".jpg")
 
 
-def search(terms, output="../../addons21/GenericLanguageHelper/user_files/"):
-    for x in range(len(terms)):
-        all_links = get_links(terms[x])
-        download(all_links, output, x)
+def search(term, output="../../addons21/GenericLanguageHelper/user_files/"):
+    all_links = get_links(str(term))
+    download(all_links, output)
 
 
 if __name__ == '__main__':
-    terms = ["狗"]
-    search(terms, output="images/")
+    term = "狗"
+    search(term)

@@ -8,13 +8,11 @@ import base64
 import logging
 import re
 import os
-import multiprocessing
+import threading
 
 from urllib.request import urlopen, Request, urlretrieve
 import requests
-import concurrent.futures
 from urllib.parse   import quote
-from PyQt5.QtMultimedia import QSound
 
 from time import sleep
 # programtically go through google image ajax json return
@@ -26,16 +24,18 @@ pattern = re.compile("Play\(\d+,'(.*?)'")
 AUDIO_URL = "https://audio00.forvo.com/mp3/"
 
 
-def get_links(query_string):
+def get_links(query_string, lang):
     # initialize place for links
     links = []
     # step by 100 because each return gives up to 100 links
     #query_string = str(query_string.encode('utf-8').strip())
     #for i in range(0, num_images, 100):
-    url = 'https://forvo.com/word/%E7%8B%97/#zh'
 
-    print(url)
-    
+    if lang:
+        url = 'https://forvo.com/word/' + quote(query_string) + '/#' + lang
+    else:
+        url = 'https://forvo.com/word/' + quote(query_string)
+
     # set user agent to avoid 403 error
     request = Request(url, None, {'User-Agent': 'Mozilla/5.0'})
 
@@ -59,41 +59,46 @@ def get_links(query_string):
     for j in range(len(plays)):
         match = pattern.search(plays[j]["onclick"])
         if match:
-            links.append(url + base64.b64decode(match.group(1)).decode())
+            links.append(AUDIO_URL + base64.b64decode(match.group(1)).decode())
 
     return links
 
 
-def f(x):
-    print("in f")
-    sleep(3)
+def download(term, links, directory):
+    threads = []
+    for i in range(0, len(links)):
 
-    return x*x
+        file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
 
-def download(links, directory):
-    #for i in range(10):
-    #    print("starting download")
-    #    p = multiprocessing.Process(target=urlretrieve, args=(links[i], "./"+directory+"/"+str(i)+".mp3"))
-    #    p.start()
-    #    print("ended")
-        #urlretrieve(links[i], )
+        thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
+        threads.append(thread)
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+    """
     with multiprocessing.Pool(5) as p:
         print('starting download"')
-        multiple_results = [p.apply_async(urlretrieve, (links[i], "./"+directory+"/"+str(i)+".mp3",)) for i in range(10)]
+        multiple_results = [p.apply_async(urlretrieve, (links[i], "directory"+str(i)+".mp3",)) for i in range(10)]
         p.close()
         try:
             p.join()
         except TimeoutError:
             logging.error("Timed out waiting to download audio from Forvo")
 
+    """
+
         #print([res.get(timeout=5) for res in multiple_results])
+    return True
 
-
-def search(term, output="../../addons21/GenericLanguageHelper/user_files/"):
-    all_links = get_links(term)
-    download(all_links, output)
+def search(term, lang, output="../../addons21/GenericLanguageHelper/user_files/"):
+    all_links = get_links(term, lang)
+    download(term, all_links, output)
+    return len(all_links)
 
 
 if __name__ == '__main__':
-    term = "狗"
-    search(term, output="audio/")
+    term = "精确"
+    search(term, "zh", output="user_files/")
