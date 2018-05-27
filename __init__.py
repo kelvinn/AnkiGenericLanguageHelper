@@ -1,23 +1,17 @@
-import sys
-import os
 import functools
-
-import sys
-sys.path.append("/Users/kelvin/Workspace/anki")
-
 
 # import the main window object (mw) from aqt
 from aqt import mw
+
 # import the "show info" tool from utils.py
 from aqt.utils import showInfo
+
 # import all of the Qt GUI library
 from aqt.qt import *
 from anki.sound import play
 from random import randrange
 from urllib.parse import quote
-from .get_images import search
-from GenericLanguageHelper import get_images
-from GenericLanguageHelper import get_audio
+from .scraper import Forvo, GoogleImages
 
 
 class UI(QWidget):
@@ -36,12 +30,14 @@ class UI(QWidget):
         self.word_field = None
         self.image_field = None
         self.audio_field = None
+        self.forvo = Forvo()
+        self.gi = GoogleImages()
         self.initUI()
  
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
-        self.note_ids = self.getTagsWithGLT()
+        self.note_ids = self.get_tags_with_glt()
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
         else:
@@ -62,9 +58,9 @@ class UI(QWidget):
         self.btn_grp = QButtonGroup()
         self.btn_grp.setExclusive(True)
 
-        self.createFrovoGridLayout()
-        self.createImageGridLayout()
-        self.createWordTextBoxLayout()
+        self.create_forvo_grid_layout()
+        self.create_image_grid_layout()
+        self.create_word_textbox_layout()
 
         windowLayout = QVBoxLayout()
         windowLayout.addWidget(self.horizontalGroupBoxWord)
@@ -79,33 +75,7 @@ class UI(QWidget):
  
         self.show()
 
-    """
-    def resetUI(self):
-
-        self.selected_image = None
-        self.selected_audio = None
-
-        self.btn_grp = QButtonGroup()
-        self.btn_grp.setExclusive(True)
-
-        self.createFrovoGridLayout()
-        self.createImageGridLayout()
-        self.createWordTextBoxLayout()
-
-        windowLayout = QVBoxLayout()
-        windowLayout.addWidget(self.horizontalGroupBoxWord)
-        windowLayout.addWidget(self.horizontalGroupBoxAudio)
-        windowLayout.addWidget(self.horizontalGroupBoxImages)
-
-        button_next = QPushButton("Save")
-        button_next.mousePressEvent = functools.partial(self.next_card, source_object=button_next)
-
-        windowLayout.addWidget(button_next)
-        self.setLayout(windowLayout)
-    """
-
-
-    def getTagsWithGLT(self):
+    def get_tags_with_glt(self):
         ids = mw.col.findNotes("tag:glt")
         return ids
 
@@ -117,7 +87,7 @@ class UI(QWidget):
         self.current_note[self.image_field] = u'<img src="%s">' % image_fname
         self.current_note.delTag("glt")
         self.current_note.flush()
-        self.note_ids = self.getTagsWithGLT()
+        self.note_ids = self.get_tags_with_glt()
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
         else:
@@ -126,19 +96,15 @@ class UI(QWidget):
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
         self.textbox.setText(self.current_word)
-        self.populateForvoButtons()
-        self.populateImageLayout()
+        self.populate_forvo_buttons()
+        self.populate_image_layout()
 
     def save_image_selection(self, event, source_object=None, labels=None):
-        print("Clicked, from", source_object)
-        #source_object.palette().highlight().color().name()
         for label in labels:
             label.setStyleSheet("QLabel { padding: 4px;}"
                                 "QLabel { background-color : palette(window); color : blue; }")
         source_object.setStyleSheet("QLabel { background-color : red; color : blue; } QLabel { padding: 4px; }")
-        #source_object.setStyleSheet("QLabel{background:transparent}")
         self.selected_image = str(source_object.abs_image_path)
-        print(source_object.filename)
 
     def save_audio_selection(self, event, source_object=None):
         source_object.toggle()
@@ -146,10 +112,8 @@ class UI(QWidget):
         play(str(source_object.abs_audio_path))
 
 
-    def createWordTextBoxLayout(self):
+    def create_word_textbox_layout(self):
         self.horizontalGroupBoxWord = QGroupBox("Word")
-
-
         layout = QGridLayout()
         self.textbox = QLineEdit(self)
         self.textbox.setText(self.current_word)
@@ -159,7 +123,7 @@ class UI(QWidget):
 
         self.horizontalGroupBoxWord.setLayout(layout)
 
-    def populateForvoButtons(self):
+    def populate_forvo_buttons(self):
 
         tags = self.current_note.tags
         try:
@@ -167,11 +131,9 @@ class UI(QWidget):
         except:
             lang = None
 
-        num_audio_files = get_audio.search(self.current_word, lang)
-
+        num_audio_files = self.forvo.search(self.current_word, lang)
         for col in range(0, min(5, num_audio_files)):
 
-            label = QLabel(self)
             file_name = 'forvo_%s_%s.mp3' % (quote(self.current_word), col)
             audio_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
             abs_audio_path = os.path.abspath(audio_path)
@@ -188,51 +150,16 @@ class UI(QWidget):
             self.btn_grp.addButton(button)
             self.forvo_layout.addWidget(button, 0, col)
 
-    def createFrovoGridLayout(self):
+    def create_forvo_grid_layout(self):
         self.horizontalGroupBoxAudio = QGroupBox("Audio")
         self.forvo_layout = QGridLayout()
-        self.populateForvoButtons()
-
-        """
-        audio_counter = 0
-        for col in range(0, num_audio_files):
-            audio_counter = audio_counter + 1
-            label = QLabel(self)
-            file_name = 'forvo_%s_%s.mp3' % (quote(word), col)
-            audio_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
-            abs_audio_path = os.path.abspath(audio_path)
-
-            r = str(randrange(10000, 90000))
-
-            button = QPushButton(r)
-            button.forvo_id = randrange(10000,90000)
-            button.abs_audio_path = abs_audio_path
-            button.audio_file_name = file_name
-            button.mousePressEvent = functools.partial(self.print_id, source_object=button)
-            # button.clicked.connect(self.on_click)
-            button.setCheckable(True)
-            self.btn_grp.addButton(button)
-            layout.addWidget(button, 0, col)
-
-        for col in range(0,5):
-            r = randrange(10000,90000)
-            button = QPushButton(str(r))
-            button.forvo_id = r
-            button.mousePressEvent = functools.partial(self.print_id, source_object=button)
-            #button.clicked.connect(self.on_click)
-            button.setCheckable(True)
-            self.btn_grp.addButton(button)
-            layout.addWidget(button, 0, col)
-        """
-
-
+        self.populate_forvo_buttons()
         self.horizontalGroupBoxAudio.setLayout(self.forvo_layout)
 
-
-    def populateImageLayout(self):
+    def populate_image_layout(self):
         labels = []
 
-        get_images.search(self.current_word)
+        self.gi.search(self.current_word)
         image_counter = 0
         for row in range(0, 2):
             for col in range(0, 4):
@@ -240,24 +167,15 @@ class UI(QWidget):
                 label = QLabel(self)
                 image_path = '../../addons21/GenericLanguageHelper/user_files/%s.jpg' % image_counter
                 pixmap = QPixmap(image_path).scaledToHeight(150)
-                # pixmap = QPixmap('user_files/dog.jpg').scaledToWidth(200)
-                # dir_path = os.path.dirname(os.path.realpath(__file__))
-                # cwd = os.getcwd()
-                # showInfo(cwd)
+
                 defaultHLBackground = "#%02x%02x%02x" % label.palette().highlight().color().getRgb()[:3]
                 defaultHLText = "#%02x%02x%02x" % label.palette().highlightedText().color().getRgb()[:3]
 
                 label.setPixmap(pixmap)
-
-                # label.setStyleSheet("QWidget:pressed { background:%s; color: %s;} QWidget { padding: 4px;}" % (
-                #    defaultHLBackground, defaultHLText))
-
-                # label.setStyleSheet("QLabel { background-color : red; color : blue; }");
                 label.setStyleSheet("QLabel:hover { background:%s; color: %s;}"
                                     "QLabel { background-color : palette(window); color : blue; }"
                                     "QLabel { padding: 4px; }" % (
                                         defaultHLBackground, defaultHLText))
-                # label.setStyleSheet("QLabel:active { background-color : red; color : blue; } QLabel { padding: 4px; }")
                 labels.append(label)
 
                 label.filename = "row" + str(row) + " col" + str(col)
@@ -267,10 +185,10 @@ class UI(QWidget):
                 self.image_layout.addWidget(label, row, col)
 
 
-    def createImageGridLayout(self):
+    def create_image_grid_layout(self):
         self.horizontalGroupBoxImages = QGroupBox("Images")
         self.image_layout = QGridLayout()
-        self.populateImageLayout()
+        self.populate_image_layout()
         self.horizontalGroupBoxImages.setLayout(self.image_layout)
 
 
@@ -287,6 +205,7 @@ if __name__ == '__main__':
 else:
     # create a new menu item, "test"
     action = QAction("Generic Language Tool", mw)
+
     # set it to call testFunction when it's clicked
     action.triggered.connect(connectUI)
 
