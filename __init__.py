@@ -127,8 +127,8 @@ class UI(QWidget):
 
         self.downloaded.start()
         self.progress_window.start_fake_counter()
-
         self.show()
+
 
     def get_tags_with_glt(self):
         ids = mw.col.findNotes("tag:glt")
@@ -165,11 +165,9 @@ class UI(QWidget):
         if self.downloaded.isRunning():
             self.downloaded.terminate()
 
-
         self.downloaded = DownloadThread(self.current_word, self.current_note, self.progress_window)
         self.downloaded.mySignal.connect(self.download_callback)
         self.downloaded.start()
-
 
     def save_image_selection(self, event, source_object=None, labels=None):
         for label in labels:
@@ -194,20 +192,13 @@ class UI(QWidget):
 
         self.horizontalGroupBoxWord.setLayout(layout)
 
-
-    def done(self):
-        self.populate_image_layout()
-
-    @pyqtSlot(int)
-    def done_forvo(self, r):
-        self.populate_forvo_buttons(r)
-
     @pyqtSlot(int, int)
     def download_callback(self, num_audio_files, num_image_files):
-        self.progress_window.hide()
+
         self.textbox.setText(self.current_word)
-        self.populate_image_layout()
+        self.populate_image_layout(num_image_files)
         self.populate_forvo_buttons(num_audio_files)
+        self.progress_window.hide()
 
     def clear_layout(self, layout):
         for i in reversed(range(layout.count())):
@@ -244,11 +235,10 @@ class UI(QWidget):
         self.forvo_layout = QGridLayout()
         self.horizontalGroupBoxAudio.setLayout(self.forvo_layout)
 
-
-    def populate_image_layout(self):
+    def populate_image_layout(self, num_image_files):
         labels = []
-
         image_counter = 0
+
         for row in range(0, 2):
             for col in range(0, 4):
                 image_counter = image_counter + 1

@@ -50,7 +50,11 @@ class Forvo:
         new_soup = Soup(html, 'html.parser')
 
         # all img tags, only returns results of search
-        plays = new_soup.find_all("span", "play")
+        #plays = new_soup.find_all("span", "play")
+
+        # Find the anchor, go two parents up, then find all related links
+        plays = new_soup.find("em", id=lang).parent.parent.find_all("span", "play")
+
 
         # loop through images and put src in links list
         for j in range(len(plays)):
@@ -62,13 +66,16 @@ class Forvo:
 
     def download(self, term, links, directory):
         threads = []
-        for i in range(0, min(5, len(links))):
+        links = links[:5]
+        filenames = []
+        for i in range(len(links)):
             """
             file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
             urlretrieve(links[i], "./" + directory + "/" + file_name)
 
             """
             file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
+            filenames.append(file_name)
 
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
             threads.append(thread)
@@ -79,14 +86,12 @@ class Forvo:
         for thread in threads:
             thread.join()
 
-
-
-        return True
+        return filenames
 
     def search(self, term, lang, output="../../addons21/GenericLanguageHelper/user_files/"):
         all_links = self.get_links(term, lang)
-        self.download(term, all_links, output)
-        return len(all_links)
+        filenames = self.download(term, all_links, output)
+        return len(filenames)
 
 
 class GoogleImages:
@@ -98,7 +103,7 @@ class GoogleImages:
         links = []
         # step by 100 because each return gives up to 100 links
 
-        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&hl=zh&q=' + quote(query_string) + '&tbm=isch&tbs=iar:s&ved=' \
+        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&hl=zh&q=' + quote(query_string + "type:jpg") + '&tbm=isch&tbs=iar:s&ved=' \
               '0ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ&start=' \
               '&yv=2&vet=10ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ.1m7NWePfFYaGmQG51q7IBg.i&ijn=1&asearch=' \
               'ichunk&async=_id:rg_s,_pms:s'
@@ -130,13 +135,17 @@ class GoogleImages:
     def download(self, term, links, directory):
         threads = []
 
-        for i in range(min(len(links), 10)):
+        links = links[:10]
+        filenames = []
+        for i in range(len(links)):
             """
             file_name = 'glt_%s_%s.jpg' % (quote(term), i)
             urlretrieve(links[i], "./" + directory + "/" + file_name)
     
             """
             file_name = 'glt_%s_%s.jpg' % (quote(term), i)
+            filenames.append(file_name)
+
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
             threads.append(thread)
 
@@ -146,9 +155,11 @@ class GoogleImages:
         for thread in threads:
             thread.join()
 
+        return filenames
 
 
     def search(self, term, output="../../addons21/GenericLanguageHelper/user_files/"):
         all_links = self.get_links(str(term))
-        self.download(str(term), all_links, output)
-        return len(all_links)
+        filenames = self.download(str(term), all_links, output)
+        return len(filenames)
+
