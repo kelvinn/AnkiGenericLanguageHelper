@@ -13,6 +13,47 @@ from random import randrange
 from urllib.parse import quote
 from .scraper import Forvo, GoogleImages
 
+from time import sleep, time
+
+
+class Window(QProgressDialog):
+    def __init__(self):
+        QProgressDialog.__init__(self)
+        self.setWindowTitle("Downloading Media")
+        self.setLabelText("Downloading images and audio...")
+        self.canceled.connect(self.close)
+        self.setRange(0, 100)
+
+    def start_fake_counter(self):
+        for count in range(self.minimum(), self.maximum()):
+            self.setValue(count)
+            qApp.processEvents()
+            sleep(0.15)
+
+
+class DownloadThread(QThread):
+
+    mySignal = pyqtSignal(int, int)
+
+    def __init__(self, current_word, current_note, progress_window):
+        super().__init__()
+        self.current_word = current_word
+        self.current_note = current_note
+        self.progress_window = progress_window
+        self.forvo = Forvo()
+        self.gi = GoogleImages()
+
+    def run(self):
+
+        tags = self.current_note.tags
+        try:
+            lang = next((i for i in tags if i.startswith("lang"))).split('=')[1]
+        except:
+            lang = None
+        num_image_files = self.gi.search(self.current_word)
+        num_audio_files = self.forvo.search(self.current_word, lang)
+        self.mySignal.emit(num_audio_files, num_image_files)
+
 
 class UI(QWidget):
  
@@ -30,6 +71,7 @@ class UI(QWidget):
         self.word_field = None
         self.image_field = None
         self.audio_field = None
+
         self.forvo = Forvo()
         self.gi = GoogleImages()
         self.initUI()
@@ -41,7 +83,9 @@ class UI(QWidget):
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
         else:
-            showInfo("No more notes!")
+            showInfo("No more notes tagged with 'glt'!")
+            return
+
         self.current_note = mw.col.getNote(self.current_note_id)
 
         config = mw.addonManager.getConfig(__name__)
@@ -51,6 +95,12 @@ class UI(QWidget):
 
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
+
+        self.progress_window = Window()
+        self.progress_window.setMinimumWidth(350)
+
+        self.downloaded = DownloadThread(self.current_word, self.current_note, self.progress_window)
+        self.downloaded.mySignal.connect(self.download_callback)
 
         self.selected_image = None
         self.selected_audio = None
@@ -71,15 +121,25 @@ class UI(QWidget):
         button_next.mousePressEvent = functools.partial(self.next_card, source_object=button_next)
 
         windowLayout.addWidget(button_next)
+
         self.setLayout(windowLayout)
- 
+        self.progress_window.show()
+
+        self.downloaded.start()
+        self.progress_window.start_fake_counter()
+
         self.show()
 
     def get_tags_with_glt(self):
         ids = mw.col.findNotes("tag:glt")
         return ids
 
+    @pyqtSlot(int)
+    def on_resized(r):
+        print('Circle was resized to radius %s.' % r)
+
     def next_card(self, event, source_object=None):
+
         audio_fname = mw.col.media.addFile(self.selected_audio)
         image_fname = mw.col.media.addFile(self.selected_image)
 
@@ -91,13 +151,25 @@ class UI(QWidget):
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
         else:
-            showInfo("No more notes!")
+            showInfo("No more notes tagged with 'glt'!")
+            return
+
+        self.progress_window.show()
+        self.progress_window.start_fake_counter()
+
         self.current_note = mw.col.getNote(self.current_note_id)
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
-        self.textbox.setText(self.current_word)
-        self.populate_forvo_buttons()
-        self.populate_image_layout()
+
+        # Kill thread if running
+        if self.downloaded.isRunning():
+            self.downloaded.terminate()
+
+
+        self.downloaded = DownloadThread(self.current_word, self.current_note, self.progress_window)
+        self.downloaded.mySignal.connect(self.download_callback)
+        self.downloaded.start()
+
 
     def save_image_selection(self, event, source_object=None, labels=None):
         for label in labels:
@@ -111,7 +183,6 @@ class UI(QWidget):
         self.selected_audio = str(source_object.abs_audio_path)
         play(str(source_object.abs_audio_path))
 
-
     def create_word_textbox_layout(self):
         self.horizontalGroupBoxWord = QGroupBox("Word")
         layout = QGridLayout()
@@ -123,15 +194,33 @@ class UI(QWidget):
 
         self.horizontalGroupBoxWord.setLayout(layout)
 
-    def populate_forvo_buttons(self):
 
-        tags = self.current_note.tags
-        try:
-            lang = next((i for i in tags if i.startswith("lang"))).split('=')[1]
-        except:
-            lang = None
+    def done(self):
+        self.populate_image_layout()
 
-        num_audio_files = self.forvo.search(self.current_word, lang)
+    @pyqtSlot(int)
+    def done_forvo(self, r):
+        self.populate_forvo_buttons(r)
+
+    @pyqtSlot(int, int)
+    def download_callback(self, num_audio_files, num_image_files):
+        self.progress_window.hide()
+        self.textbox.setText(self.current_word)
+        self.populate_image_layout()
+        self.populate_forvo_buttons(num_audio_files)
+
+    def clear_layout(self, layout):
+        for i in reversed(range(layout.count())):
+            widgetToRemove = layout.itemAt(i).widget()
+            # remove it from the layout list
+            layout.removeWidget(widgetToRemove)
+            # remove it from the gui
+            widgetToRemove.setParent(None)
+
+    def populate_forvo_buttons(self, num_audio_files):
+
+        #num_audio_files = self.forvo.search(self.current_word, lang)
+
         for col in range(0, min(5, num_audio_files)):
 
             file_name = 'forvo_%s_%s.mp3' % (quote(self.current_word), col)
@@ -145,7 +234,7 @@ class UI(QWidget):
             button.abs_audio_path = abs_audio_path
             button.audio_file_name = file_name
             button.mousePressEvent = functools.partial(self.save_audio_selection, source_object=button)
-            # button.clicked.connect(self.on_click)
+
             button.setCheckable(True)
             self.btn_grp.addButton(button)
             self.forvo_layout.addWidget(button, 0, col)
@@ -153,19 +242,20 @@ class UI(QWidget):
     def create_forvo_grid_layout(self):
         self.horizontalGroupBoxAudio = QGroupBox("Audio")
         self.forvo_layout = QGridLayout()
-        self.populate_forvo_buttons()
         self.horizontalGroupBoxAudio.setLayout(self.forvo_layout)
+
 
     def populate_image_layout(self):
         labels = []
 
-        self.gi.search(self.current_word)
         image_counter = 0
         for row in range(0, 2):
             for col in range(0, 4):
                 image_counter = image_counter + 1
                 label = QLabel(self)
-                image_path = '../../addons21/GenericLanguageHelper/user_files/%s.jpg' % image_counter
+                file_name = 'glt_%s_%s.jpg' % (quote(self.current_word), image_counter)
+                image_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
+
                 pixmap = QPixmap(image_path).scaledToHeight(150)
 
                 defaultHLBackground = "#%02x%02x%02x" % label.palette().highlight().color().getRgb()[:3]
@@ -184,11 +274,9 @@ class UI(QWidget):
                 label.mousePressEvent = functools.partial(self.save_image_selection, source_object=label, labels=labels)
                 self.image_layout.addWidget(label, row, col)
 
-
     def create_image_grid_layout(self):
         self.horizontalGroupBoxImages = QGroupBox("Images")
         self.image_layout = QGridLayout()
-        self.populate_image_layout()
         self.horizontalGroupBoxImages.setLayout(self.image_layout)
 
 

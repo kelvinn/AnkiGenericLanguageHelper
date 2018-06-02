@@ -12,7 +12,6 @@ import urllib
 import base64
 import logging
 import re
-import os
 import threading
 
 from urllib.request import urlopen, Request, urlretrieve
@@ -63,8 +62,12 @@ class Forvo:
 
     def download(self, term, links, directory):
         threads = []
-        for i in range(0, len(links)):
+        for i in range(0, min(5, len(links))):
+            """
+            file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
+            urlretrieve(links[i], "./" + directory + "/" + file_name)
 
+            """
             file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
 
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
@@ -75,6 +78,8 @@ class Forvo:
 
         for thread in threads:
             thread.join()
+
+
 
         return True
 
@@ -122,10 +127,28 @@ class GoogleImages:
 
         return links
 
-    def download(self, links, directory):
-        for i in range(10):
-            urlretrieve(links[i], "./" + directory + "/" + str(i) + ".jpg")
+    def download(self, term, links, directory):
+        threads = []
+
+        for i in range(min(len(links), 10)):
+            """
+            file_name = 'glt_%s_%s.jpg' % (quote(term), i)
+            urlretrieve(links[i], "./" + directory + "/" + file_name)
+    
+            """
+            file_name = 'glt_%s_%s.jpg' % (quote(term), i)
+            thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
+            threads.append(thread)
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+
 
     def search(self, term, output="../../addons21/GenericLanguageHelper/user_files/"):
         all_links = self.get_links(str(term))
-        self.download(all_links, output)
+        self.download(str(term), all_links, output)
+        return len(all_links)
