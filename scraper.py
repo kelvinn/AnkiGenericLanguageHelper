@@ -98,12 +98,13 @@ class GoogleImages:
     def __init__(self):
         pass
 
-    def get_links(self, query_string):
+    def get_links(self, query_string, lang):
         # initialize place for links
         links = []
         # step by 100 because each return gives up to 100 links
 
-        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&hl=zh&q=' + quote(query_string + "type:jpg") + '&tbm=isch&tbs=iar:s&ved=' \
+        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&q=' + quote(query_string +
+              ' type:jpg') + '&tbm=isch&tbs=iar:s&ved=' \
               '0ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ&start=' \
               '&yv=2&vet=10ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ.1m7NWePfFYaGmQG51q7IBg.i&ijn=1&asearch=' \
               'ichunk&async=_id:rg_s,_pms:s'
@@ -135,7 +136,7 @@ class GoogleImages:
     def download(self, term, links, directory):
         threads = []
 
-        links = links[:10]
+        links = links[:50]
         filenames = []
         for i in range(len(links)):
             """
@@ -157,9 +158,14 @@ class GoogleImages:
 
         return filenames
 
-
-    def search(self, term, output="../../addons21/GenericLanguageHelper/user_files/"):
-        all_links = self.get_links(str(term))
+    def search(self, term, lang, output="../../addons21/GenericLanguageHelper/user_files/"):
+        all_links = self.get_links(query_string=str(term), lang=lang)
         filenames = self.download(str(term), all_links, output)
         return len(filenames)
+
+if __name__ == '__main__':
+    term = "什麼"
+    gi = GoogleImages()
+    filenames = gi.search(term, lang='zh', output='user_files/')
+    print(filenames)
 

@@ -50,7 +50,8 @@ class DownloadThread(QThread):
             lang = next((i for i in tags if i.startswith("lang"))).split('=')[1]
         except:
             lang = None
-        num_image_files = self.gi.search(self.current_word)
+
+        num_image_files = self.gi.search(self.current_word, lang)
         num_audio_files = self.forvo.search(self.current_word, lang)
         self.mySignal.emit(num_audio_files, num_image_files)
 
@@ -80,6 +81,7 @@ class UI(QWidget):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
         self.note_ids = self.get_tags_with_glt()
+        self.setMinimumWidth(750)
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
         else:
@@ -116,6 +118,7 @@ class UI(QWidget):
         windowLayout.addWidget(self.horizontalGroupBoxWord)
         windowLayout.addWidget(self.horizontalGroupBoxAudio)
         windowLayout.addWidget(self.horizontalGroupBoxImages)
+        #windowLayout.addWidget(scroll)
 
         button_next = QPushButton("Save")
         button_next.mousePressEvent = functools.partial(self.next_card, source_object=button_next)
@@ -137,6 +140,31 @@ class UI(QWidget):
     @pyqtSlot(int)
     def on_resized(r):
         print('Circle was resized to radius %s.' % r)
+
+    def skip_card(self, event, source_object=None):
+        self.current_note.delTag("glt")
+        self.current_note.flush()
+        self.note_ids = self.get_tags_with_glt()
+        if len(self.note_ids) > 0:
+            self.current_note_id = self.note_ids[0]
+        else:
+            showInfo("No more notes tagged with 'glt'!")
+            return
+
+        self.progress_window.show()
+        self.progress_window.start_fake_counter()
+
+        self.current_note = mw.col.getNote(self.current_note_id)
+        note_items = dict(self.current_note.items())
+        self.current_word = str(note_items[self.word_field])
+
+        # Kill thread if running
+        if self.downloaded.isRunning():
+            self.downloaded.terminate()
+
+        self.downloaded = DownloadThread(self.current_word, self.current_note, self.progress_window)
+        self.downloaded.mySignal.connect(self.download_callback)
+        self.downloaded.start()
 
     def next_card(self, event, source_object=None):
 
@@ -239,10 +267,11 @@ class UI(QWidget):
         labels = []
         image_counter = 0
 
-        for row in range(0, 2):
+        for row in range(0, 20):
             for col in range(0, 4):
                 image_counter = image_counter + 1
                 label = QLabel(self)
+                label.setFixedWidth(158)
                 file_name = 'glt_%s_%s.jpg' % (quote(self.current_word), image_counter)
                 image_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
 
@@ -250,7 +279,6 @@ class UI(QWidget):
 
                 defaultHLBackground = "#%02x%02x%02x" % label.palette().highlight().color().getRgb()[:3]
                 defaultHLText = "#%02x%02x%02x" % label.palette().highlightedText().color().getRgb()[:3]
-
                 label.setPixmap(pixmap)
                 label.setStyleSheet("QLabel:hover { background:%s; color: %s;}"
                                     "QLabel { background-color : palette(window); color : blue; }"
@@ -262,12 +290,25 @@ class UI(QWidget):
                 label.abs_image_path = image_path
 
                 label.mousePressEvent = functools.partial(self.save_image_selection, source_object=label, labels=labels)
+                #self.image_layout.setRowMinimumWidth(row, 160)
+
                 self.image_layout.addWidget(label, row, col)
 
     def create_image_grid_layout(self):
         self.horizontalGroupBoxImages = QGroupBox("Images")
-        self.image_layout = QGridLayout()
-        self.horizontalGroupBoxImages.setLayout(self.image_layout)
+        self.layout = QHBoxLayout(self)
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)  # Set to make the inner widget resize with scroll area
+        self.scrollArea.setMinimumHeight(400)
+        self.scrollArea.setMinimumWidth(655)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setMinimumWidth(650)
+        self.image_layout = QGridLayout(self.scrollAreaWidgetContents)
+        self.horizontalGroupBoxImages.setMinimumWidth(680)
+
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.layout.addWidget(self.scrollArea)
+        self.horizontalGroupBoxImages.setLayout(self.layout)
 
 
 def connectUI():
