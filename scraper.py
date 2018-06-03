@@ -136,7 +136,7 @@ class GoogleImages:
     def download(self, term, links, directory):
         threads = []
 
-        links = links[:50]
+        links = links[:95]
         filenames = []
         for i in range(len(links)):
             """

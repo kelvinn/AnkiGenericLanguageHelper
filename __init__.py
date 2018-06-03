@@ -72,6 +72,8 @@ class UI(QWidget):
         self.word_field = None
         self.image_field = None
         self.audio_field = None
+        self.extra_field = None
+        self.extra_details = None
 
         self.forvo = Forvo()
         self.gi = GoogleImages()
@@ -94,10 +96,11 @@ class UI(QWidget):
         self.word_field = config['word_field']
         self.audio_field = config['audio_field']
         self.image_field = config['image_field']
+        self.extra_field = config['extra_field']
 
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
-
+        self.extra_details = str(note_items[self.extra_field])
         self.progress_window = Window()
         self.progress_window.setMinimumWidth(350)
 
@@ -118,12 +121,26 @@ class UI(QWidget):
         windowLayout.addWidget(self.horizontalGroupBoxWord)
         windowLayout.addWidget(self.horizontalGroupBoxAudio)
         windowLayout.addWidget(self.horizontalGroupBoxImages)
-        #windowLayout.addWidget(scroll)
+        #windowLayout.addWidget(self.horizontalButtonBox)
+
+        self.hbox = QHBoxLayout()
+        self.hbox.addStretch(1)
+
+        self.vbox = QVBoxLayout()
+        self.vbox.addStretch(1)
+        self.vbox.addLayout(self.hbox)
+
+        button_skip = QPushButton("Skip")
+        button_skip.mousePressEvent = functools.partial(self.skip_card, source_object=button_skip)
+
+        self.hbox.addWidget(button_skip)
 
         button_next = QPushButton("Save")
         button_next.mousePressEvent = functools.partial(self.next_card, source_object=button_next)
 
-        windowLayout.addWidget(button_next)
+        self.hbox.addWidget(button_next)
+
+        windowLayout.addLayout(self.vbox)
 
         self.setLayout(windowLayout)
         self.progress_window.show()
@@ -157,6 +174,7 @@ class UI(QWidget):
         self.current_note = mw.col.getNote(self.current_note_id)
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
+        self.extra_details = str(note_items[self.extra_field])
 
         # Kill thread if running
         if self.downloaded.isRunning():
@@ -168,16 +186,21 @@ class UI(QWidget):
 
     def next_card(self, event, source_object=None):
 
-        audio_fname = mw.col.media.addFile(self.selected_audio)
-        image_fname = mw.col.media.addFile(self.selected_image)
+        if self.selected_audio:
 
-        self.current_note[self.audio_field] = u'[sound:%s]' % audio_fname
-        self.current_note[self.image_field] = u'<img src="%s">' % image_fname
+            audio_fname = mw.col.media.addFile(self.selected_audio)
+            self.current_note[self.audio_field] = u'[sound:%s]' % audio_fname
+
+        if self.selected_image:
+            image_fname = mw.col.media.addFile(self.selected_image)
+            self.current_note[self.image_field] = u'<img src="%s">' % image_fname
+
         self.current_note.delTag("glt")
         self.current_note.flush()
         self.note_ids = self.get_tags_with_glt()
         if len(self.note_ids) > 0:
             self.current_note_id = self.note_ids[0]
+
         else:
             showInfo("No more notes tagged with 'glt'!")
             return
@@ -188,6 +211,7 @@ class UI(QWidget):
         self.current_note = mw.col.getNote(self.current_note_id)
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
+        self.extra_details = str(note_items[self.extra_field])
 
         # Kill thread if running
         if self.downloaded.isRunning():
@@ -211,19 +235,39 @@ class UI(QWidget):
 
     def create_word_textbox_layout(self):
         self.horizontalGroupBoxWord = QGroupBox("Word")
+        self.horizontalGroupBoxWord.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
         layout = QGridLayout()
-        self.textbox = QLineEdit(self)
-        self.textbox.setText(self.current_word)
-        self.textbox.resize(280, 40)
 
-        layout.addWidget(self.textbox)
+        newfont = QFont("Times", 22, QFont.Bold)
 
-        self.horizontalGroupBoxWord.setLayout(layout)
+        self.word_label = QLabel(self)
+        self.word_label.setText(self.current_word)
+        self.word_label.setFont(newfont)
+
+        self.word_label.setFixedWidth(50)
+
+        self.extra_detail_label = QLabel(self)
+        self.extra_detail_label.setText(self.extra_details)
+        self.hbox2 = QHBoxLayout()
+        self.hbox2.setSpacing(10)
+        self.hbox2.setDirection(QBoxLayout.LeftToRight)
+
+        self.vbox2 = QVBoxLayout()
+
+        self.vbox2.addLayout(self.hbox2)
+        self.vbox2.setAlignment(Qt.AlignLeft)
+
+        self.hbox2.addWidget(self.word_label)
+
+        self.hbox2.addWidget(self.extra_detail_label)
+
+        self.horizontalGroupBoxWord.setLayout(self.vbox2)
 
     @pyqtSlot(int, int)
     def download_callback(self, num_audio_files, num_image_files):
 
-        self.textbox.setText(self.current_word)
+        self.word_label.setText(self.current_word)
+        self.extra_detail_label.setText(self.extra_details)
         self.populate_image_layout(num_image_files)
         self.populate_forvo_buttons(num_audio_files)
         self.progress_window.hide()
@@ -267,7 +311,7 @@ class UI(QWidget):
         labels = []
         image_counter = 0
 
-        for row in range(0, 20):
+        for row in range(0, 24):
             for col in range(0, 4):
                 image_counter = image_counter + 1
                 label = QLabel(self)
@@ -290,8 +334,6 @@ class UI(QWidget):
                 label.abs_image_path = image_path
 
                 label.mousePressEvent = functools.partial(self.save_image_selection, source_object=label, labels=labels)
-                #self.image_layout.setRowMinimumWidth(row, 160)
-
                 self.image_layout.addWidget(label, row, col)
 
     def create_image_grid_layout(self):
@@ -309,6 +351,10 @@ class UI(QWidget):
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.layout.addWidget(self.scrollArea)
         self.horizontalGroupBoxImages.setLayout(self.layout)
+
+
+    def create_button_layout(self):
+        self.horizontalButtonBox = QHBoxLayout()
 
 
 def connectUI():

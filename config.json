@@ -1,1 +1,2 @@
-{"word_field": "Word", "image_field": "Picture", "audio_field": "Pronunciation (Recording and/or IPA)"}
+{"word_field": "Word", "image_field": "Picture", "audio_field": "Pronunciation (Recording and/or IPA)",
+"extra_field": "Gender, Personal Connection, Extra Info (Back side)"}
