@@ -10,10 +10,8 @@ from aqt.utils import showInfo
 from aqt.qt import *
 from anki.sound import play
 from random import randrange
-from urllib.parse import quote
-from .scraper import Forvo, GoogleImages
-
-from time import sleep, time
+from .scraper import Forvo, GoogleImages, slugify
+from time import sleep
 
 
 class Window(QProgressDialog):
@@ -244,7 +242,8 @@ class UI(QWidget):
         self.word_label.setText(self.current_word)
         self.word_label.setFont(newfont)
 
-        self.word_label.setFixedWidth(50)
+        self.word_label.setFixedWidth(100)
+        self.word_label.setWordWrap(True);
 
         self.extra_detail_label = QLabel(self)
         self.extra_detail_label.setText(self.extra_details)
@@ -283,10 +282,10 @@ class UI(QWidget):
     def populate_forvo_buttons(self, num_audio_files):
 
         #num_audio_files = self.forvo.search(self.current_word, lang)
-
+        self.clear_layout(self.forvo_layout)
         for col in range(0, min(5, num_audio_files)):
 
-            file_name = 'forvo_%s_%s.mp3' % (quote(self.current_word), col)
+            file_name = slugify('forvo_%s_%s' % (self.current_word, col)) + ".mp3"
             audio_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
             abs_audio_path = os.path.abspath(audio_path)
 
@@ -316,7 +315,7 @@ class UI(QWidget):
                 image_counter = image_counter + 1
                 label = QLabel(self)
                 label.setFixedWidth(158)
-                file_name = 'glt_%s_%s.jpg' % (quote(self.current_word), image_counter)
+                file_name = slugify('glt_%s_%s' % (self.current_word, image_counter)) + ".jpg"
                 image_path = '../../addons21/GenericLanguageHelper/user_files/' + file_name
 
                 pixmap = QPixmap(image_path).scaledToHeight(150)

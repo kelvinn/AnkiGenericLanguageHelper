@@ -1,29 +1,35 @@
 # -*- encoding: utf-8 -*-
 '''DISCLAIMER: DUE TO COPYRIGHT ISSUES, IMAGES GATHERED SHOULD
    ONLY BE USED FOR RESEARCH AND EDUCATION PURPOSES ONLY'''
-from bs4 import BeautifulSoup as Soup
-import json
-import urllib
-from urllib.request import urlopen, Request, urlretrieve
 from urllib.parse import quote
 from bs4 import BeautifulSoup as Soup
 import json
-import urllib
 import base64
-import logging
 import re
 import threading
+import unicodedata
 
 from urllib.request import urlopen, Request, urlretrieve
-import requests
-from urllib.parse   import quote
-
-from time import sleep
 
 # programtically go through google image ajax json return
 # and save links to list
 # num_images is more of a suggestion
 # it will get the ceiling of the nearest 100 if available
+
+
+def slugify(value, allow_unicode=False):
+    """
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces to hyphens.
+    Remove characters that aren't alphanumerics, underscores, or hyphens.
+    Convert to lowercase. Also strip leading and trailing whitespace.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value).strip().lower()
+    return re.sub(r'[-\s]+', '-', value)
 
 
 class Forvo:
@@ -49,9 +55,6 @@ class Forvo:
         # use BeautifulSoup to parse as html
         new_soup = Soup(html, 'html.parser')
 
-        # all img tags, only returns results of search
-        #plays = new_soup.find_all("span", "play")
-
         # Find the anchor, go two parents up, then find all related links
         plays = new_soup.find("em", id=lang).parent.parent.find_all("span", "play")
 
@@ -69,12 +72,8 @@ class Forvo:
         links = links[:5]
         filenames = []
         for i in range(len(links)):
-            """
-            file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
-            urlretrieve(links[i], "./" + directory + "/" + file_name)
 
-            """
-            file_name = 'forvo_%s_%s.mp3' % (quote(term), i)
+            file_name = slugify('forvo_%s_%s' % (term, i)) + ".mp3"
             filenames.append(file_name)
 
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
@@ -85,6 +84,7 @@ class Forvo:
 
         for thread in threads:
             thread.join()
+
 
         return filenames
 
@@ -103,8 +103,7 @@ class GoogleImages:
         links = []
         # step by 100 because each return gives up to 100 links
 
-        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&q=' + quote(query_string +
-              ' type:jpg') + '&tbm=isch&tbs=iar:s&ved=' \
+        url = 'https://www.google.com/search?ei=1m7NWePfFYaGmQG51q7IBg&q=' + quote(query_string) + '&tbm=isch&tbs=iar:s&tbs=ift:jpg&ved=' \
               '0ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ&start=' \
               '&yv=2&vet=10ahUKEwjjovnD7sjWAhUGQyYKHTmrC2kQuT0I7gEoAQ.1m7NWePfFYaGmQG51q7IBg.i&ijn=1&asearch=' \
               'ichunk&async=_id:rg_s,_pms:s'
@@ -139,12 +138,8 @@ class GoogleImages:
         links = links[:95]
         filenames = []
         for i in range(len(links)):
-            """
-            file_name = 'glt_%s_%s.jpg' % (quote(term), i)
-            urlretrieve(links[i], "./" + directory + "/" + file_name)
-    
-            """
-            file_name = 'glt_%s_%s.jpg' % (quote(term), i)
+
+            file_name = slugify('glt_%s_%s' % (term, i)) + ".jpg"
             filenames.append(file_name)
 
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
@@ -163,9 +158,14 @@ class GoogleImages:
         filenames = self.download(str(term), all_links, output)
         return len(filenames)
 
+
 if __name__ == '__main__':
-    term = "什麼"
+    term = "美國"
     gi = GoogleImages()
     filenames = gi.search(term, lang='zh', output='user_files/')
+
     print(filenames)
 
+    forvo = Forvo()
+    filenames = forvo.search(term, lang='zh', output='user_files/')
+    print(filenames)
