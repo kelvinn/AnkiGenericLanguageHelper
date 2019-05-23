@@ -3,6 +3,7 @@
    ONLY BE USED FOR RESEARCH AND EDUCATION PURPOSES ONLY'''
 from urllib.parse import quote
 import json
+import os
 import re
 import threading
 import unicodedata
@@ -32,10 +33,10 @@ class Config:
             self.parsed = json.loads(data)
 
     def forvo_api_key(self):
-        return self.parsed.get('forvo_api_key')
+        return os.getenv('FORVO_API_KEY') or self.parsed.get('forvo_api_key')
 
     def bing_api_key(self):
-        return self.parsed.get('bing_api_key')
+        return os.getenv('BING_API_KEY') or self.parsed.get('bing_api_key')
 
 
 def slugify(value, allow_unicode=True):
