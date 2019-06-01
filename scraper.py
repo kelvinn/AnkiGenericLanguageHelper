@@ -65,7 +65,7 @@ class Forvo:
         # initialize place for links
         links = []
         query_string = query_string.replace(" ", '') # Forvo API doesn't deal that well with multiple words
-        url = f'https://apifree.forvo.com/key/{self.forvo_api_key}/format/json/action/word-pronunciations/word/' \
+        url = f'https://apifree.forvo.com/id_order/rate_desc/key/{self.forvo_api_key}/format/json/action/word-pronunciations/word/' \
               f'{quote(query_string)}/language/{lang}'
 
         # set user agent to avoid 403 error
@@ -145,8 +145,9 @@ class BingImages:
 
         return filenames
 
-    def search(self, term, lang, output="../../addons21/AnkiGenericLanguageHelper/user_files/"):
-        all_links = self.get_links(query_string=str(term).encode(), lang=lang)
+    def search(self, term, lang, image_text, output="../../addons21/AnkiGenericLanguageHelper/user_files/"):
+        search_term = image_text or term
+        all_links = self.get_links(query_string=str(search_term).encode(), lang=lang)
         filenames = self.download(str(term), all_links, output)
         return len(filenames)
 

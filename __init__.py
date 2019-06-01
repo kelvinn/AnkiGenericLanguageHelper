@@ -14,6 +14,8 @@ from random import randrange
 from .scraper import Forvo, BingImages, slugify
 from time import sleep
 
+USER_FILE_PATH = "../../addons21/AnkiGenericLanguageHelper/user_files/"
+
 
 class Window(QProgressDialog):
     def __init__(self):
@@ -34,10 +36,11 @@ class DownloadThread(QThread):
 
     mySignal = pyqtSignal(int, int)
 
-    def __init__(self, current_word, current_note, progress_window):
+    def __init__(self, current_word, current_note, progress_window, image_text=None):
         super().__init__()
         self.current_word = current_word
         self.current_note = current_note
+        self.image_text = image_text
         self.progress_window = progress_window
         self.forvo = Forvo()
         self.bi = BingImages()
@@ -50,7 +53,7 @@ class DownloadThread(QThread):
         except:
             lang = None
 
-        num_image_files = self.bi.search(self.current_word, lang)
+        num_image_files = self.bi.search(self.current_word, lang, image_text=self.image_text)
         num_audio_files = self.forvo.search(self.current_word, lang)
         self.mySignal.emit(num_audio_files, num_image_files)
 
@@ -128,6 +131,15 @@ class UI(QWidget):
         self.vbox.addStretch(1)
         self.vbox.addLayout(self.hbox)
 
+        self.search_textbox = QLineEdit(self)
+
+        self.hbox.addWidget(self.search_textbox)
+
+        button_search = QPushButton("Search")
+        button_search.mousePressEvent = functools.partial(self.search_again, source_object=button_search)
+
+        self.hbox.addWidget(button_search)
+
         button_skip = QPushButton("Skip")
         button_skip.mousePressEvent = functools.partial(self.skip_card, source_object=button_skip)
 
@@ -155,6 +167,28 @@ class UI(QWidget):
     def on_resized(r):
         print('Circle was resized to radius %s.' % r)
 
+    def search_again(self, event, source_object=None):
+        showInfo(self.search_textbox.text())
+        # Kill thread if running
+        if self.downloaded.isRunning():
+            self.downloaded.terminate()
+
+        self.current_note = mw.col.getNote(self.current_note_id)
+        note_items = dict(self.current_note.items())
+        self.current_word = str(note_items[self.word_field])
+        self.extra_details = str(note_items[self.extra_field])
+
+        self.downloaded = DownloadThread(current_word=self.current_word,
+                                         current_note=self.current_note,
+                                         progress_window=self.progress_window,
+                                         image_text=self.search_textbox.text())
+
+        self.downloaded.mySignal.connect(self.download_callback)
+        self.downloaded.start()
+
+        self.progress_window.show()
+        self.progress_window.start_fake_counter()
+
     def skip_card(self, event, source_object=None):
         self.current_note.delTag("glt")
         self.current_note.flush()
@@ -168,6 +202,7 @@ class UI(QWidget):
         self.progress_window.show()
         self.progress_window.start_fake_counter()
 
+        self.search_textbox.setText("")
         self.current_note = mw.col.getNote(self.current_note_id)
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
@@ -192,6 +227,7 @@ class UI(QWidget):
             image_fname = mw.col.media.addFile(self.selected_image)
             self.current_note[self.image_field] = u'<img src="%s">' % image_fname
 
+        self.search_textbox.setText("")
         self.current_note.delTag("glt")
         self.current_note.flush()
         self.note_ids = self.get_tags_with_glt()
@@ -308,13 +344,20 @@ class UI(QWidget):
         labels = []
         image_counter = 0
 
+        # Should we download an image?
+        #existing_image = self.current_note[self.image_field] if self.current_note else None
+        #if existing_image:
+        #    image_fname = existing_image.split('"')[1]
+        ##    num_image_files = 0
+        #    num_audio_files
+
         for row in range(0, 24):
             for col in range(0, 4):
                 image_counter = image_counter + 1
                 label = QLabel(self)
                 label.setFixedWidth(158)
                 file_name = slugify('glt_%s_%s' % (self.current_word, image_counter)) + ".jpg"
-                image_path = '../../addons21/AnkiGenericLanguageHelper/user_files/' + file_name
+                image_path = f'{USER_FILE_PATH}' + file_name
 
                 pixmap = QPixmap(image_path).scaledToHeight(150)
 
@@ -332,6 +375,7 @@ class UI(QWidget):
 
                 label.mousePressEvent = functools.partial(self.save_image_selection, source_object=label, labels=labels)
                 self.image_layout.addWidget(label, row, col)
+
 
     def create_image_grid_layout(self):
         self.horizontalGroupBoxImages = QGroupBox("Images")
