@@ -9,6 +9,7 @@ import threading
 import unicodedata
 
 from urllib.request import urlopen, Request, urlretrieve
+from urllib.error import HTTPError
 import ssl
 import requests
 
@@ -37,6 +38,14 @@ class Config:
 
     def bing_api_key(self):
         return os.getenv('BING_API_KEY') or self.parsed.get('bing_api_key')
+
+
+def silent_urlretrieve(url, local_filename):
+    try:
+        urlretrieve(url, local_filename)
+        return True
+    except HTTPError:
+        return False
 
 
 def slugify(value, allow_unicode=True):
@@ -96,15 +105,18 @@ class Forvo:
         for thread in threads:
             thread.start()
 
-        for thread in threads:
-            thread.join()
+        # Blocks returning filenames until all but 5 threads have died and or downloaded successfully
+        # Probably should use a thread pool executer...
+        num_active = len(threads)
+        while num_active > 0:
+            num_active = [thread.is_alive() for thread in threads].count(True)
 
         return filenames
 
     def search(self, term, lang, output="../../addons21/AnkiGenericLanguageHelper/user_files/"):
         all_links = self.get_links(str(term), lang)
         filenames = self.download(str(term), all_links, output)
-        return len(filenames)
+        return filenames
 
 
 class BingImages:
@@ -113,10 +125,11 @@ class BingImages:
         self.subscription_key = c.bing_api_key()
         self.search_url = "https://api.cognitive.microsoft.com/bing/v7.0/images/search"
         self.search_term = "puppies"
+        self.market = c.parsed.get('image_market')
 
     def get_links(self, query_string, lang):
         headers = {"Ocp-Apim-Subscription-Key": self.subscription_key}
-        params = {"q": query_string, "cc": "TW", "count": 100}
+        params = {"q": query_string, "cc": self.market, "count": 100, "safeSearch": "Strict"}
 
         response = requests.get(self.search_url, headers=headers, params=params)
         response.raise_for_status()
@@ -134,14 +147,16 @@ class BingImages:
             file_name = slugify('glt_%s_%s' % (term, i)) + ".jpg"
             filenames.append(file_name)
 
-            thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
+            thread = threading.Thread(target=silent_urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
             threads.append(thread)
 
         for thread in threads:
             thread.start()
 
-        for thread in threads:
-            thread.join()
+        # Blocks returning filenames until all but 5 threads have died and or downloaded successfully
+        num_active = len(threads)
+        while num_active > 5:
+            num_active = [thread.is_alive() for thread in threads].count(True)
 
         return filenames
 
@@ -149,16 +164,19 @@ class BingImages:
         search_term = image_text or term
         all_links = self.get_links(query_string=str(search_term).encode(), lang=lang)
         filenames = self.download(str(term), all_links, output)
-        return len(filenames)
+        return filenames
 
 
 if __name__ == '__main__':
+    import time
     example_term = "美國"
     bi = BingImages()
-    filenames = bi.search(example_term, lang='zh', output='user_files/')
-
-    print(filenames)
+    start = time.time()
+    image_filenames = bi.search(term=example_term, image_text=example_term, lang='zh', output='user_files/')
+    end = time.time()
+    print(end - start)
+    print(len(image_filenames))
 
     forvo = Forvo()
-    filenames = forvo.search(example_term, lang='zh', output='user_files/')
-    print(filenames)
+    audio_filenames = forvo.search(example_term, lang='zh', output='user_files/')
+    print(len(audio_filenames))

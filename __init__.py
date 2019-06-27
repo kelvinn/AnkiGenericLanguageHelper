@@ -23,7 +23,7 @@ class Window(QProgressDialog):
         self.setWindowTitle("Downloading Media")
         self.setLabelText("Downloading images and audio...")
         self.canceled.connect(self.close)
-        self.setRange(0, 100)
+        self.setRange(0, 30)
 
     def start_fake_counter(self):
         for count in range(self.minimum(), self.maximum()):
@@ -34,7 +34,7 @@ class Window(QProgressDialog):
 
 class DownloadThread(QThread):
 
-    mySignal = pyqtSignal(int, int)
+    mySignal = pyqtSignal(list, list)
 
     def __init__(self, current_word, current_note, progress_window, image_text=None):
         super().__init__()
@@ -53,9 +53,9 @@ class DownloadThread(QThread):
         except:
             lang = None
 
-        num_image_files = self.bi.search(self.current_word, lang, image_text=self.image_text)
-        num_audio_files = self.forvo.search(self.current_word, lang)
-        self.mySignal.emit(num_audio_files, num_image_files)
+        dl_image_filenames = self.bi.search(self.current_word, lang, image_text=self.image_text)
+        dl_audio_filenames = self.forvo.search(self.current_word, lang)
+        self.mySignal.emit(dl_audio_filenames, dl_image_filenames)
 
 
 class UI(QWidget):
@@ -76,6 +76,16 @@ class UI(QWidget):
         self.audio_field = None
         self.extra_field = None
         self.extra_details = None
+        self.selected_image = None
+        self.selected_audio = None
+
+        # Init once off UI components
+        self.progress_window = Window()
+        self.btn_grp = QButtonGroup()
+        self.downloaded = DownloadThread(None, None, self.progress_window)
+        self.hbox = QHBoxLayout()
+        self.vbox = QVBoxLayout()
+        self.search_textbox = QLineEdit(self)
 
         self.forvo = Forvo()
         self.bi = BingImages()
@@ -103,7 +113,7 @@ class UI(QWidget):
         note_items = dict(self.current_note.items())
         self.current_word = str(note_items[self.word_field])
         self.extra_details = str(note_items[self.extra_field])
-        self.progress_window = Window()
+
         self.progress_window.setMinimumWidth(350)
 
         self.downloaded = DownloadThread(self.current_word, self.current_note, self.progress_window)
@@ -112,26 +122,23 @@ class UI(QWidget):
         self.selected_image = None
         self.selected_audio = None
 
-        self.btn_grp = QButtonGroup()
         self.btn_grp.setExclusive(True)
 
         self.create_forvo_grid_layout()
         self.create_image_grid_layout()
         self.create_word_textbox_layout()
 
-        windowLayout = QVBoxLayout()
-        windowLayout.addWidget(self.horizontalGroupBoxWord)
-        windowLayout.addWidget(self.horizontalGroupBoxAudio)
-        windowLayout.addWidget(self.horizontalGroupBoxImages)
+        windowlayout = QVBoxLayout()
+        windowlayout.addWidget(self.horizontalGroupBoxWord)
+        windowlayout.addWidget(self.horizontalGroupBoxAudio)
+        windowlayout.addWidget(self.horizontalGroupBoxImages)
 
-        self.hbox = QHBoxLayout()
         self.hbox.addStretch(1)
 
-        self.vbox = QVBoxLayout()
         self.vbox.addStretch(1)
         self.vbox.addLayout(self.hbox)
 
-        self.search_textbox = QLineEdit(self)
+        self.search_textbox.resize(300, 40)
 
         self.hbox.addWidget(self.search_textbox)
 
@@ -150,9 +157,9 @@ class UI(QWidget):
 
         self.hbox.addWidget(button_next)
 
-        windowLayout.addLayout(self.vbox)
+        windowlayout.addLayout(self.vbox)
 
-        self.setLayout(windowLayout)
+        self.setLayout(windowlayout)
         self.progress_window.show()
 
         self.downloaded.start()
@@ -168,7 +175,6 @@ class UI(QWidget):
         print('Circle was resized to radius %s.' % r)
 
     def search_again(self, event, source_object=None):
-        showInfo(self.search_textbox.text())
         # Kill thread if running
         if self.downloaded.isRunning():
             self.downloaded.terminate()
@@ -228,7 +234,12 @@ class UI(QWidget):
             self.current_note[self.image_field] = u'<img src="%s">' % image_fname
 
         self.search_textbox.setText("")
+
         self.current_note.delTag("glt")
+
+        # Unsuspend card if it is suspended
+        mw.col.sched.unsuspendCards([card.id for card in self.current_note.cards()])
+
         self.current_note.flush()
         self.note_ids = self.get_tags_with_glt()
         if len(self.note_ids) > 0:
@@ -237,6 +248,9 @@ class UI(QWidget):
         else:
             showInfo("No more notes tagged with 'glt'!")
             return
+
+        self.selected_audio = None
+        self.selected_image = None
 
         self.progress_window.show()
         self.progress_window.start_fake_counter()
@@ -297,13 +311,13 @@ class UI(QWidget):
 
         self.horizontalGroupBoxWord.setLayout(self.vbox2)
 
-    @pyqtSlot(int, int)
-    def download_callback(self, num_audio_files, num_image_files):
+    @pyqtSlot(list, list)
+    def download_callback(self, dl_audio_filenames, dl_image_filenames):
 
         self.word_label.setText(self.current_word)
         self.extra_detail_label.setText(self.extra_details)
-        self.populate_image_layout(num_image_files)
-        self.populate_forvo_buttons(num_audio_files)
+        self.populate_image_layout(dl_image_filenames)
+        self.populate_forvo_buttons(dl_audio_filenames)
         self.progress_window.hide()
 
     def clear_layout(self, layout):
@@ -314,10 +328,10 @@ class UI(QWidget):
             # remove it from the gui
             widgetToRemove.setParent(None)
 
-    def populate_forvo_buttons(self, num_audio_files):
+    def populate_forvo_buttons(self, dl_audio_filenames):
 
         self.clear_layout(self.forvo_layout)
-        for col in range(0, min(5, num_audio_files)):
+        for col in range(0, min(5, len(dl_audio_filenames))):
 
             file_name = slugify('forvo_%s_%s' % (self.current_word, col)) + ".mp3"
             audio_path = '../../addons21/AnkiGenericLanguageHelper/user_files/' + file_name
@@ -340,16 +354,9 @@ class UI(QWidget):
         self.forvo_layout = QGridLayout()
         self.horizontalGroupBoxAudio.setLayout(self.forvo_layout)
 
-    def populate_image_layout(self, num_image_files):
+    def populate_image_layout(self, dl_image_filenames):
         labels = []
         image_counter = 0
-
-        # Should we download an image?
-        #existing_image = self.current_note[self.image_field] if self.current_note else None
-        #if existing_image:
-        #    image_fname = existing_image.split('"')[1]
-        ##    num_image_files = 0
-        #    num_audio_files
 
         for row in range(0, 24):
             for col in range(0, 4):
@@ -392,7 +399,6 @@ class UI(QWidget):
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.layout.addWidget(self.scrollArea)
         self.horizontalGroupBoxImages.setLayout(self.layout)
-
 
     def create_button_layout(self):
         self.horizontalButtonBox = QHBoxLayout()
