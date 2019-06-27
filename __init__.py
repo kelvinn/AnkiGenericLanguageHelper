@@ -222,6 +222,18 @@ class UI(QWidget):
         self.downloaded.mySignal.connect(self.download_callback)
         self.downloaded.start()
 
+    @staticmethod
+    def clean_user_data():
+        import glob
+
+        to_delete_files = glob.glob(USER_FILE_PATH + '/glt_*', recursive=True)
+
+        for file_path in to_delete_files:
+            try:
+                os.remove(file_path)
+            except OSError:
+                print("Error while deleting file")
+
     def next_card(self, event, source_object=None):
 
         if self.selected_audio:
@@ -239,6 +251,9 @@ class UI(QWidget):
 
         # Unsuspend card if it is suspended
         mw.col.sched.unsuspendCards([card.id for card in self.current_note.cards()])
+
+        # Now we clean user data of any glt leftover files
+        self.clean_user_data()
 
         self.current_note.flush()
         self.note_ids = self.get_tags_with_glt()
@@ -333,7 +348,7 @@ class UI(QWidget):
         self.clear_layout(self.forvo_layout)
         for col in range(0, min(5, len(dl_audio_filenames))):
 
-            file_name = slugify('forvo_%s_%s' % (self.current_word, col)) + ".mp3"
+            file_name = slugify('glt_forvo_%s_%s' % (self.current_word, col)) + ".mp3"
             audio_path = '../../addons21/AnkiGenericLanguageHelper/user_files/' + file_name
             abs_audio_path = os.path.abspath(audio_path)
 

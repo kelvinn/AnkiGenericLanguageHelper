@@ -96,7 +96,7 @@ class Forvo:
         filenames = []
         for i in range(len(links)):
 
-            file_name = slugify('forvo_%s_%s' % (term, i)) + ".mp3"
+            file_name = slugify('glt_forvo_%s_%s' % (term, i)) + ".mp3"
             filenames.append(file_name)
 
             thread = threading.Thread(target=urlretrieve, args=(links[i], "./" + directory + "/" + file_name))
